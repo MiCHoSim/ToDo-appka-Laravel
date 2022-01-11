@@ -3,7 +3,6 @@
 namespace App\Policies;
 
 use App\Models\ToDoItem;
-use App\Models\ToDoItemUser;
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Auth\Access\Response;
@@ -14,7 +13,7 @@ class ToDoItemPolicy
     use HandlesAuthorization;
 
     /**
-     * Určuje, či ma uživateľ pŕistup do zoznamu úloh
+     * Specifies whether the user has access to the task list
      *
      * @return bool
      */
@@ -24,7 +23,7 @@ class ToDoItemPolicy
     }
 
     /**
-     * Určuje, či sa môže uživateľovy zobraziť detail úlohy
+     * Specifies whether the user's job detail can be displayed
      *
      * @param User $user
      * @param ToDoItem $toDoItem
@@ -34,13 +33,13 @@ class ToDoItemPolicy
     {
         if (!$user->userHasThisTask($toDoItem))
         {
-            return Response::deny('Nieste autorom tejto úlohy!',404);
+            return Response::deny('Nieste vlastníkom tejto úlohy!');
         }
         return Response::allow();
     }
 
     /**
-     * Určuje, či uživateľ môže vytvárať úlohu
+     * Specifies whether the user can create a task
      *
      * @return bool
      */
@@ -50,7 +49,7 @@ class ToDoItemPolicy
     }
 
     /**
-     * Určuje, či uživateľ môže editovať úlohu
+     * Specifies whether the user can edit the task
      *
      * @param User $user
      * @param ToDoItem $toDoItem
@@ -58,7 +57,7 @@ class ToDoItemPolicy
      */
     public function update(User $user, ToDoItem $toDoItem)
     {
-        if ($user->id != $toDoItem->autor_id)
+        if ($user->id != $toDoItem->author_id)
         {
             return Response::deny('Nieste autorom tejto úlohy!');
         }
@@ -66,7 +65,7 @@ class ToDoItemPolicy
     }
 
     /**
-     * Určuje, či uživateľ môže odstrániť úlohu
+     * Specifies whether the user can delete the task
      *
      * @param User $user
      * @param ToDoItem $toDoItem
@@ -74,7 +73,7 @@ class ToDoItemPolicy
      */
     public function delete(User $user, ToDoItem $toDoItem)
     {
-        if ($user->id != $toDoItem->autor_id)
+        if ($user->id != $toDoItem->author_id)
         {
             return Response::deny('Nieste autorom tejto úlohy!');
         }
@@ -82,8 +81,8 @@ class ToDoItemPolicy
     }
 
     /**
-     * Určuje, či uživateľ môže úlohu nastaviť ako dokončenú
-     * (aby to fungovalo treba pridať (prepojiť) 'updateDone' => 'updateDone' do ovladača -> resourceAbilityMap())
+     * Specifies whether the user can set the task to complete
+     * (for this to work, add (link) 'updateDone' => 'updateDone' to the driver -> resourceAbilityMap())
      *
      * @param User $user
      * @param ToDoItem $toDoItem
@@ -93,13 +92,13 @@ class ToDoItemPolicy
     {
         if (!$user->userHasThisTask($toDoItem))
         {
-            return Response::deny('Nieste autorom tejto úlohy!');
+            return Response::deny('Nieste vlastníkom tejto úlohy!');
         }
         return Response::allow();
     }
     /**
-     * Určuje, či uživateľ môže úlohu nastaviť ako dokončenú
-     * (aby to fungovalo treba pridať (prepojiť) 'shared' => 'shared' do ovladača -> resourceAbilityMap())
+     * Specifies whether the user can set the task to complete
+     * (for this to work, add (link) 'shared' => 'shared' to the driver -> resourceAbilityMap())
      *
      * @param User $user
      * @param ToDoItem $toDoItem
@@ -107,7 +106,7 @@ class ToDoItemPolicy
      */
     public function shared(User $user, ToDoItem $toDoItem)
     {
-        if (!$user->userAutorThisTask($toDoItem))
+        if ($toDoItem->author_id != $user->id)
         {
             return Response::deny('Nieste autorom tejto úlohy!');
         }

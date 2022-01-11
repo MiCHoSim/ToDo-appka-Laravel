@@ -18,8 +18,8 @@
         <div class="form-group">
             <label for="category_id">Kategória</label>
             <select class="form-control" name="category_id" id="category_id">
-                @foreach ($categories as $id => $name)
-                    <option {{ old('category_id') == $id ? 'selected' : '' }} value="{{ $id }}">{{ $name }}</option>
+                @foreach ($categories as $category)
+                    <option {{ old('category_id') == $category->id ? 'selected' : '' }} value="{{ $category->id }}">{{ $category->name }}</option>
                 @endforeach
             </select>
         </div>

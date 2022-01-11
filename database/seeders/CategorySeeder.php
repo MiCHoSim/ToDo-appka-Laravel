@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 class CategorySeeder extends Seeder
 {
     /**
-     * Vygeneruj Kategórie To Do úloh.
+     * Run the database seeds.
      *
      * @return void
      */

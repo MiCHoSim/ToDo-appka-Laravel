@@ -6,19 +6,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class ToDoItem extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     /**
-     * Konštanty filtra.
+     * Filter constants.
      */
     const
-        CATEGORY_ID = 'category_id',
         DONE = 'done',
         MINE = 'mine',
         SHARED_WITH_ME = 'shared_with_me',
@@ -26,20 +25,7 @@ class ToDoItem extends Model
         ALL = 'all';
 
     /**
-     * Nastavený filter
-     * @var string
-     */
-    public $filter;
-
-    /**
-     * Hodnota filtrovanej kategórie
-     *
-     * @var NULL|int
-     */
-    public $categoryId;
-
-    /**
-     * Pole vlastností, ktoré niesu chranené pred mass assigment útokom.
+     * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
@@ -48,6 +34,7 @@ class ToDoItem extends Model
         'term',
         'category_id',
         'done',
+        'author_id',
     ];
 
     /**
@@ -60,7 +47,7 @@ class ToDoItem extends Model
     ];
 
     /**
-     * Vytvor inštanciu Eloquent modelu.
+     * Create an instance of the Eloquent model.
      *
      * @param  array $attributes
      * @return void
@@ -69,25 +56,36 @@ class ToDoItem extends Model
     {
         parent::__construct($attributes);
 
-        // Automaticke pridelenie prihlaseného uživateľa do eloquent modelu
+        /*
+        // Automatic assignment of the logged in user to the eloquent model
         self::creating(static function (ToDoItem $toDoItem) {
             if (Auth::check()) {
-                $toDoItem->autor_id = Auth::id();
+                $toDoItem->author_id = Auth::id();
             }
-        });
+        })
+        */
     }
 
     /**
-     * Vrať pole Filtra, kluč je konštanta filtra a hodnota názov filtra.
+     * Returns a category filter, where key is the all / id category and value is the category name
      *
      * @return array
      */
-    public function getFilters(): array
+    public function getFilterCategories(): array
     {
-        $category = new Category();
+        return [self::ALL => 'Všetky'] + Category::orderBy('name')->get()->pluck('name','id')->toArray();
+    }
+
+
+    /**
+     * Returns a filter where key is the filter constant and value is the name of the filter
+     *
+     * @return array
+     */
+    public function getFilter(): array
+    {
         return [
             self::ALL => 'Všetky',
-            self::CATEGORY_ID => array('name' => 'Kategórie') + $category->getCategoriesPairs(),
             self::DONE => 'Dokončené',
             self::MINE => 'Moje',
             self::SHARED_WITH_ME => 'Zdieľané so mnou',
@@ -96,101 +94,70 @@ class ToDoItem extends Model
     }
 
     /**
-     * Zvaliduj hodnoty pre Filter
+     * Return to the Filtered Task List
      *
-     * @param string $filterItems Prikaz filtrovania podľa
-     * @return RedirectResponse|void
-     */
-    public function validateFilter($filterItems)
-    {
-        $activFilterArray = explode('-',$filterItems); //Rozdelenie filtra na Filter a Kategóriu
-        $this->filter = $activFilterArray[0]; // Filter
-        $this->categoryId = isset($activFilterArray[1]) ? $activFilterArray[1] : NULL; // Hodnota filtra
-
-        // Validacia Filtra
-        if(!in_array($this->filter, array_keys($this->getFilters())) && $this->filter !== '')
-            return redirect()->route('task.index');
-
-        if($this->categoryId !== NULL || $this->filter === ToDoItem::CATEGORY_ID)
-        {
-            $category = new Category();
-
-            if(!in_array($this->categoryId, array_keys($category->getCategoriesPairs())))
-                return redirect()->route('task.index');
-        }
-    }
-
-    /**
-     * Vrať Filtrovaný zoznam Úloh
-     *
+     * @param array $activFilter Set filter
      * @return mixed
      */
-    public function getItemsByFilter()
+    public function getItemsByFilter($activFilter)
     {
-        // Filtrovanie podľa Kategórie
-        if($this->filter === ToDoItem::CATEGORY_ID)
-        {                                     //->where('done', 0)
-            return User::find(Auth::id())->toDoItems()->where($this->filter, $this->categoryId)->orderBy('term')->simplePaginate(5)->withQueryString();
-        }
-        // Filtrovanie podľa toho či je úloha dokončená
-        if($this->filter=== ToDoItem::DONE)
+        $query = new ToDoItem();
+
+        //category filtering
+        if (in_array($activFilter['category'], Category::get()->pluck('id')->toArray()))
         {
-            return User::find(Auth::id())->toDoItems()->where($this->filter, 1)->simplePaginate(5)->withQueryString();
+            $query = $query->where('category_id', $activFilter['category']);
         }
-        // Filtrovanie podľa toho či je prihlasený uživateľ autorom úlohy,
-       if($this->filter === ToDoItem::MINE)
+
+        //ilter completed tasks
+        if ($activFilter['filter'] === ToDoItem::DONE)
         {
-            return ToDoItem::join('to_do_item_user','to_do_items.id','to_do_item_user.to_do_item_id')
-                ->where('to_do_items.autor_id', Auth::id())
-                ->where('to_do_item_user.user_id', '=', Auth::id())->orderBy('term')
-                ->simplePaginate(5)->withQueryString();
+            $query = $query->where('done', 1);
         }
-        // úlohy, ktoré sú prihlasenému uživateľovy zdieľané
-        if($this->filter === ToDoItem::SHARED_WITH_ME)
+        // filtering the tasks of the logged in user / author
+        elseif ($activFilter['filter'] === ToDoItem::MINE)
         {
-            return User::find(Auth::id())->toDoItems()->where('to_do_items.autor_id', '!=',Auth::id())->simplePaginate(5)->withQueryString();
+            $query = $query->where('author_id', Auth::id());
         }
-        // Úlohy, ktoré zdieľal prihlasený uživateľ
-        if($this->filter === ToDoItem::SHARED_WITH_YOU)
+
+        // filtering a task that is shared with a logged in user
+        if ($activFilter['filter'] === ToDoItem::SHARED_WITH_ME)
         {
-            return ToDoItem::join('to_do_item_user','to_do_items.id','to_do_item_user.to_do_item_id')
-                ->where('to_do_items.autor_id', Auth::id())
-                ->where('to_do_item_user.user_id', '!=', Auth::id())->orderBy('term')
-                ->simplePaginate(5)->withQueryString();
+            $query = $query->where('author_id', '!=', Auth::id())->whereHas('users', function ($query) {
+                return $query->where('user_id',Auth::id());
+            });
         }
-        // Všetky úlohy prihlaseného uživateľa
+        // filtering Tasks that the logged in user has shared
+        elseif ($activFilter['filter'] === ToDoItem::SHARED_WITH_YOU)
+        {
+            $query = $query->where('author_id', Auth::id())->whereHas('users', function ($query) {
+                return $query->where('user_id', '!=', Auth::id());
+            });
+        }
+        // tasks of the logged in user
         else
         {
-            return ToDoItem::join('to_do_item_user','to_do_items.id','to_do_item_user.to_do_item_id')
-                ->where('to_do_item_user.user_id', '=', Auth::id())->orderBy('term')
-                ->simplePaginate(5)->withQueryString();
+            $query = $query->whereHas('users', function ($query) {
+                return $query->where('user_id',Auth::id());
+            });
         }
+
+        return $query->orderBy('term')->simplePaginate(5)->withQueryString();
     }
 
     /**
-     * Vrať autora úlohy ako inštanciu modelu user
-     * Načíta autora úlohy
+     * Return the author of the task as an instance of the user model
+     * Loads the author of the task
      *
      * @return BelongsTo
      */
-    public function autor(): BelongsTo
+    public function author(): BelongsTo
     {
-        return $this->belongsTo(User::class,'autor_id', 'id');
+        return $this->belongsTo(User::class,'author_id');
     }
 
     /**
-     * Vrať uzivatele úlohy ako inštanciu modelu user
-     * Načita uživateľa úlohy
-     *
-     * @return BelongsTo
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class,'user_id', 'id');
-    }
-
-    /**
-     * Vrať kategóriu ako inštanciu modelu category
+     * Return the category as an instance of the category model
      *
      * @return BelongsTo
      */
@@ -200,23 +167,12 @@ class ToDoItem extends Model
     }
 
     /**
-     * Ziskaj všetkých zdieľaných uživateľov úlohy
+     * Get all shared users of the task
      *
      * @return BelongsToMany
      */
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class);
-    }
-
-    /**
-     * Vráti pole Id úloh uživateľa
-     *
-     * @param int $userId Id uživateľa
-     * @return array
-     */
-    public function getToDoItemsUser($userId): array
-    {
-        return DB::table('to_do_items')->where('autor_id', $userId)->pluck('id')->toArray();
     }
 }

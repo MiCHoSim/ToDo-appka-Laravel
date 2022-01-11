@@ -11,7 +11,7 @@ use App\Models\User;
 class UserSeeder extends Seeder
 {
     /**
-     * Vygeneruj testovacie uživateľske účty.
+     * Run the database seeds.
      *
      * @return void
      */

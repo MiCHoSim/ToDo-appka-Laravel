@@ -16,7 +16,7 @@ class ToDoItemSeeder extends Seeder
     public function run()
     {
         DB::table('to_do_items')->updateOrInsert([
-            'autor_id' => 1,
+            'author_id' => 1,
             'task' => 'Vytvoriť ToDo App',
             'term' => Carbon::create('2021', '12', '31'),
             'category_id' => 2,
@@ -26,7 +26,7 @@ class ToDoItemSeeder extends Seeder
         ]);
 
         DB::table('to_do_items')->updateOrInsert([
-            'autor_id' => 1,
+            'author_id' => 1,
             'task' => 'Skialp',
             'term' => Carbon::create('2021', '12', '29','09'),
             'category_id' => 1,
@@ -36,7 +36,7 @@ class ToDoItemSeeder extends Seeder
         ]);
 
         DB::table('to_do_items')->updateOrInsert([
-            'autor_id' => 2,
+            'author_id' => 2,
             'task' => 'Nakupiť',
             'category_id' => 3,
             'done' => 1,

@@ -15,12 +15,13 @@ class CreateToDoItemsTable extends Migration
     {
         Schema::create('to_do_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('autor_id')->references('id')->on('id')->cascadeOnDelete();
+            $table->foreignId('author_id')->constrained('users');//->cascadeOnDelete();
             $table->text('task');
             $table->timestamp('term')->nullable();
-            $table->foreignId('category_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('category_id')->constrained();//->cascadeOnDelete();
             $table->boolean('done')->default(0);
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
@@ -31,6 +32,11 @@ class CreateToDoItemsTable extends Migration
      */
     public function down()
     {
+        Schema::table('to_do_items', function (Blueprint $table) {
+            $table->dropSoftDeletes();
+            $table->dropForeign(['author_id']);
+            $table->dropForeign(['category_id']);
+        });
         Schema::dropIfExists('to_do_items');
     }
 }

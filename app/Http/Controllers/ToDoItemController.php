@@ -2,104 +2,104 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\todoitem\FilterRequest;
 use App\Http\Requests\todoitem\SharedRequest;
 use App\Http\Requests\todoitem\StoreRequest;
 use App\Http\Requests\todoitem\UpdateDoneRequest;
 use App\Http\Requests\todoitem\UpdateRequest;
 use App\Models\Category;
 use App\Models\ToDoItem;
-use App\Models\ToDoItemUser;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Exception;
 
 class ToDoItemController extends Controller
 {
     /**
-     * Nastav všetky akcie pre prihlaseného uživateľa.
+     * Set all actions for the logged in user.
      *
-     * Prepojenie akcie kontroléra s policy triedou
+     * Link the controller action to the policy class
      *
      */
     public function __construct()
     {
-        $this->middleware('auth');
+        //$this->middleware('auth');
         $this->authorizeResource(ToDoItem::class, 'task');
     }
 
     /**
-     * Zobraz a filtruj zoznam úloh prihlaseného uživateľa.
+     * View and filter the task list of the logged in user.
      *
      * @return View
      */
-    public function index(ToDoItem $toDoItem): view
+    public function index(FilterRequest $request, ToDoItem $toDoItem): view
     {
-        $activFilter = request()->get('filter'); // aktuálne nastavený filter
-        $toDoItem->validateFilter($activFilter);
+        $activFilter = isset($request->all()['category']) ? $request->all() : ['category' => ToDoItem::ALL, 'filter' => ToDoItem::ALL]; // currently set filter
 
-        $items = $toDoItem->getItemsByFilter();
+        $items = $toDoItem->getItemsByFilter($activFilter);
 
-        $user = new User();
-        $sharedUsers = $user->getUsersPairs();
-
-        return view('todoitem.index', ['items' => $items, 'filters' => $toDoItem->getFilters(), 'activFilter' => $activFilter, 'sharedUsers' => $sharedUsers]);
+        return view('todoitem.index',
+            ['items' => $items,
+                'categories' => $toDoItem->getFilterCategories(),
+                'filters' => $toDoItem->getFilter(),
+                'activFilter' => $activFilter,
+                'sharedUsers' => User::where('id', '!=',Auth::id())->orderBy('name')->get()]);
     }
 
     /**
-     * Zobraz formulár pre vytvorenie novej úlohy.
+     * Display the form for creating a new task.
      *
      * @return View
      */
     public function create():View
     {
-        $category = new Category();
-        return view('todoitem.create', ['categories' => $category->getCategoriesPairs()]);
+        return view('todoitem.create', ['categories' =>  Category::orderBy('name')->get()]);
     }
 
     /**
-     * Zvaliduj odoslané dáta a vytvor novú úlohu.
+     * Validate the submitted data and create a new task.
      *
      * @param StoreRequest $request
      * @return RedirectResponse
      */
     public function store(StoreRequest $request): RedirectResponse
     {
-        ToDoItem::create($request->all());
-        ToDoItemUser::create(['to_do_item_id'=> DB::getPdo()->lastInsertId(), 'user_id' => Auth::id()]);
+        $task = $request->all();
+        $task['author_id'] = Auth::id();
+
+        $toDoItem = ToDoItem::create($task); // save a new task
+
+        $toDoItem->users()->attach(Auth::id(),['to_do_item_id'=> $toDoItem->id]); // creating a link to the task
 
         return redirect()->route('task.index');
     }
 
     /**
-     * Načitaj To Do položku a predaj jej data do šablony
+     * Load It Into The Item And Sell It Data To The Template
      *
      * @param ToDoItem $toDoItem
      * @return View
      */
     public function show(ToDoItem $task): View
     {
-        $user = new User();
-        $sharedUsers = $user->getUsersPairs();
-        return view('todoitem.show', ['task' => $task, 'sharedUsers' => $sharedUsers]);
+        return view('todoitem.show', ['task' => $task, 'sharedUsers' => User::where('id',  '!=',Auth::id())->orderBy('name')->get()]);
     }
 
     /**
-     * Zobraz formulár na editáciu úlohy a predaj danému pohladu načitanú úlohu.
+     * Display the form for editing the task and selling the loaded task to the given view.
      *
      * @param ToDoItem $task
      * @return View
      */
     public function edit(ToDoItem $task): View
     {
-        $category = new Category();
-        return view('todoitem.edit', ['task' => $task, 'categories' => $category->getCategoriesPairs()]);
+        return view('todoitem.edit', ['task' => $task, 'categories' => Category::orderBy('name')->get()]);
     }
 
     /**
-     * Zvaliduj odoslané data a uprav úlohu.
+     *Validate the submitted data and edit the task.
      *
      * @param UpdateRequest $request
      * @param ToDoItem $task
@@ -113,7 +113,7 @@ class ToDoItemController extends Controller
     }
 
     /**
-     *  Odstráň úlohu z databáze.
+     *  Delete the task from the database.
      *
      * @param ToDoItem $task
      * @return RedirectResponse
@@ -130,10 +130,10 @@ class ToDoItemController extends Controller
     }
 
     /**
-     * Aktualizuj/Zmen hodnotu "done" v databáze
+     * Update / Change the value "done" in the database
      *
-     * @param UpdateDoneRequest $request Hodnoty formulára
-     * @param ToDoItem $task Inštancia Triedy Úloh
+     * @param UpdateDoneRequest $request Form values
+     * @param ToDoItem $task Task Class Instance
      * @return RedirectResponse
      */
     public function updateDone(UpdateDoneRequest $request, ToDoItem $task)
@@ -143,15 +143,16 @@ class ToDoItemController extends Controller
     }
 
     /**
-     * Ulož zdieľanie do tabuľky
+     * Save the share to databashe
      *
-     * @param SharedRequest $request Hodnoty formulára
-     * @param ToDoItem $task Inštancia Triedy Úloh
+     * @param SharedRequest $request Form values
+     * @param ToDoItem $task Task Class Instance
      * @return RedirectResponse
      */
     public function shared(SharedRequest $request, ToDoItem $task)
     {
-        ToDoItemUser::create($request->all());
+        $task->users()->attach($request->all()['user_id'],['to_do_item_id'=> $request->all()['to_do_item_id']]); // creating a link to the task
+
         return redirect()->back();
     }
 }

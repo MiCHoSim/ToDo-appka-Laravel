@@ -22,7 +22,7 @@ Route::get('', WelcomeController::class);
 Auth::routes();
 Auth::routes(['verify' => true]);
 
-Route::resource('task', ToDoItemController::class);
+Route::resource('task', ToDoItemController::class)->middleware('auth');
 
-Route::match(['put','patch'],'task/update-done/{task}', [ToDoItemController::class, 'updateDone'])->name('task.updateDone');
-Route::match(['post','patch'],'task/shared/{task}', [ToDoItemController::class, 'shared'])->name('task.shared');
+Route::put('task/update-done/{task}', [ToDoItemController::class, 'updateDone'])->name('task.updateDone')->middleware('auth');
+Route::post('task/shared/{task}', [ToDoItemController::class, 'shared'])->name('task.shared')->middleware('auth');

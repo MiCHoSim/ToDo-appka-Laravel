@@ -11,7 +11,7 @@ class Category extends Model
     use HasFactory;
 
     /**
-     * Pole vlastností, ktoré niesu chranené pred mass assigment útokom.
+     * The attributes that are mass assignable
      *
      * @var array
      */
@@ -19,12 +19,4 @@ class Category extends Model
         'name',
     ];
 
-    /**
-     * Vráti pole kategórií, kde kluč je id a hodnota je názov kategórie
-     * @return array
-     */
-    public function getCategoriesPairs() : array
-    {
-        return DB::table('categories')->orderBy('name')->pluck('name','id')->toArray();
-    }
 }

@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -48,7 +47,7 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /**
-     * Odošli notifikáciu pre overenie emailovej adresy.
+     * They sent a notification to verify their email address.
      *
      * @return void
      */
@@ -66,41 +65,22 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Ziskaj všetky zdieľané úlohy uživateľa
+     * Get all of the user's shared tasks
      *
      * @return BelongsToMany
      */
     public function toDoItems(): BelongsToMany
     {
-        return $this->belongsToMany(ToDoItem::class)->orderBy('term');
+        return $this->belongsToMany(ToDoItem::class);//->orderBy('term');
     }
 
     /**
-     * Skontroluj či Úloha patrí prihlasenému užívateľovi
+     * Check if the Job belongs to the logged in user
      *
      * @return bool
      */
     public function userHasThisTask(ToDoItem $task) :bool
     {
-        return ToDoItemUser::where('to_do_item_user.to_do_item_id', $task->id)->where('to_do_item_user.user_id',  Auth::id())->exists();//$this->id)->exists();
-    }
-
-    /**
-     * Skontroluj či je prihlasený autor Úlohy
-     *
-     * @return bool
-     */
-    public function userAutorThisTask(ToDoItem $task) :bool
-    {
-        return ToDoItem::where('to_do_items.id', $task->id)->where('to_do_items.autor_id', Auth::id())->exists();
-    }
-
-    /**
-     * Vráti pole uživateľov, kde kluč je id a hodnota je meno uživateľa/ okrem prihlaseného uživateľa
-     * @return array
-     */
-    public function getUsersPairs() : array
-    {
-        return DB::table('users')->where('id',  '!=',Auth::id())->orderBy('name')->pluck('name','id')->toArray();
+        return $task->users()->where('to_do_item_id', $task->id)->where('user_id', Auth::id())->exists();
     }
 }

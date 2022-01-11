@@ -8,7 +8,7 @@ use Illuminate\Contracts\View\View;
 class WelcomeController extends Controller
 {
     /**
-     * Zobraz hlavnú stránku webu.
+     * View the main page of the site.
      *
      * @param  Request $request
      * @return View
